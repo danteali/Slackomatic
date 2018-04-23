@@ -1,0 +1,269 @@
+#!/bin/bash
+
+# ----------
+# Define Webhook
+# ----------
+# Create Slack Webhook for one or more of your channels. You can send a message to any of you channels
+# even if you use a different channel's webhook by simply specifying a channel on the command line.
+# https://my.slack.com/services/new/incoming-webhook
+WEBHOOK="https://hooks.slack.com/services/AAAAAAAAA/BBBBBBBBB/CCCCCCCCCCCCCCCCCCCCCCCC"
+
+# ----------
+# Display formatting options
+# ----------
+red=`tput setaf 1`
+green=`tput setaf 2`
+yellow=`tput setaf 3`
+blue=`tput setaf 4`
+magenta=`tput setaf 5`
+cyan=`tput setaf 6`
+white=`tput setaf 7`
+reset=`tput sgr 0`
+
+
+
+
+echo "${magenta}"
+echo "><><><><><><><><><><><><><><><><><><><><><"
+echo ">< SLACKOMATIC - COMMAND LINE MESSENGER ><"
+echo "><><><><><><><><><><><><><><><><><><><><><${reset}" && echo ""
+
+# ----------
+# Commands
+# ----------
+usage()
+{
+cat << EOF
+$(echo -e "${magenta}")
+usage: $0 OPTIONS
+$(echo -e "${green}")
+=========
+= BASIC =
+=========
+Basic messages simply show a message from a specified username.
+    -u    Username ........ $(echo -e "${red}")[REQUIRED]$(echo -e "${green}") User/App to display that posts the message.
+    -t    $(echo -e "${red}")*$(echo -e "${green}")Text ........... $(echo -e "${red}")[REQUIRED]$(echo -e "${green}") 'Basic' message text, shown above attachment content.
+    -c    Channel ......... Specify Slack channel. If not defined the webhook's channel will be used.
+    -e    Emoji ........... $(echo -e "${blue}")[Note 6]$(echo -e "${green}") Emoji image for sender, see: https://unicodey.com/emoji-data/table.htm
+
+==============
+= ATTACHMENT =
+==============
+Attachment messages include an additional 'attachment' displayed under the basic message detailed above.
+    -T    Title ........... Title is displayed as larger, bold text near the top of a message attachment.
+    -l    Title Link ...... $(echo -e "${blue}")[Note 7]$(echo -e "${green}") Hyperlink for Title (must contain 'http' part).
+    -m    $(echo -e "${red}")*$(echo -e "${green}")Message ........ The main text in a message attachment.
+    -p    $(echo -e "${red}")*$(echo -e "${green}")Pretext ........ Text that appears above the message attachment block.
+    -C    Color ........... $(echo -e "${blue}")[Note 2]$(echo -e "${green}") Colour of vertical bar on left of attachment. See: http://www.color-hex.com/
+    -a    Author .......... Text to display as author's name at the top of attachment.
+    -b    Author Link ..... $(echo -e "${blue}")[Note 7]$(echo -e "${green}") Hyperlink for Author text (must contain 'http' part).
+    -B    Author Img URL .. URL to image to display on left of Author text. Will be resized to 16x16.
+    -F    $(echo -e "${red}")*$(echo -e "${green}")Footer ......... Text to be displayed in small font at the bottom of the attachment.
+    -f    Footer Img URL .. URL to image to be displayed beside the footer. Will be resized to 16x16.
+    -I    Image URL ....... $(echo -e "${blue}")[Note 3]$(echo -e "${green}") URL to image to display below the attachment. Will be resized to max 360x500.
+    -i    Thumbnail URL ... $(echo -e "${blue}")[Note 3]$(echo -e "${green}") URL to image to display as thumb on right side of attachment. Will be scaled to 75x75.
+    -q    Fallback ........ Basic text to display if the attachment can not be displayed on user's device.
+    -P    Priority ........ $(echo -e "${blue}")[Note 5]$(echo -e "${green}") Some pre-configured message formats.
+
+=========
+= OTHER =
+=========
+    -w    Webhook ......... Set API Webhook variable within script (at very top) or pass one if not setting in script.
+    -h    Help ............ Display this guidance.
+    -x    Dry-run ......... Display payload to be sent to Slack but don't actually execute send command.
+
+$(echo -e "${blue}")
+~~~~~~~~~
+~ NOTES ~
+~~~~~~~~~
+    1 ... When supplying values for the options above, use double quotes to contain the text. Remember to escape (\) any quotes
+          within your submitted text.
+    2 ... Colors (-C) are specified in hex values, lookup here: http://www.color-hex.com/
+          This script has several pre-defined colors built-in therefore the following can be specified as text instead of a hex value:
+          green (#008000), orange (#FFA500), red (#FF0000), blue (#0000FF), purple (#800080), pink (#FFC0CB), yellow (#FFFF00)
+    3 ... Both Image and Thumbnail can not be displayed in same message. Image will take precedence over thumnail if both are supplied.
+    4 ... Any characters should be okay to be entered in any field but the following three characters must be substituted:
+              > Replace the ampersand, &, with &amp;
+              > Replace the less-than sign, < with &lt;
+              > Replace the greater-than sign, > with &gt;
+    5 ... A set of priorities (case-sensitive) have been defined in this script. Specify one of the following to apply a pre-defined 'template':
+              > info : message prefix = 'INFO' ; color = blue ; emoji = :information_source: (blue 'i' sign)
+              > success : message prefix = 'SUCCESS' ; color = green ; emoji = :heavy_check_mark: (green tick)
+              > alert : message prefix = 'ALERT' ; color = red ; emoji = :warning: (yellow warning sign)
+          Any of these pre-defined fields can be individually overridden by passing that cmd line option
+    6 ... Some useful emojis: :film_frames:, :tv:, :iphone:, :computer:, :floppy_disk:, :file_folder:, :warning:,
+          :no_entry:, :hourglass:, :heavy_check_mark:, :hankey:, :fire:, :inbox_tray:, :information_source:
+    7 ... Links can also be email 'mailto's e.g. mailto:admin@testing.com
+    8 ... 'Fields' and 'Actions' can also be sent via command line but this functionality has not been implemented here.
+
+**********
+* MARKUP *
+**********
+    Fields tagged with a '$(echo -e "${red}")*$(echo -e "${blue}")' above can have Slack's markup applied to their content. Supported options:
+        > *bold*
+        > _italic_
+        > ~strikethrough~
+        > \`inline code\` - ticks need to be escaped with '\'
+        > \`\`\`embedded code\`\`\` - ticks need to be escaped with '\'
+
+$(echo -e "${reset}")
+
+EOF
+}
+
+# ----------
+# Check for empty command
+# ----------
+if [[ $@ == "" ]]; then
+    usage
+    exit 1
+fi
+
+# ----------
+# Process Command
+# ----------
+while getopts "xhu:t:c:e:T:l:m:p:C:a:b:B:F:f:I:i:q:w:P:" OPTION
+do
+    case ${OPTION} in
+        u) USERNAME="${OPTARG}" ;;
+        t) TEXT="${OPTARG}" ;;
+        c) CHANNEL="${OPTARG}" ;;
+        e) EMOJI="${OPTARG}" ;;
+        T) TITLE="${OPTARG}" ;;
+        l) TITLELINK="${OPTARG}" ;;
+        m) MESSAGE="${OPTARG}" ;;
+        p) PRETEXT="${OPTARG}" ;;
+        C) COLOR="${OPTARG}" ;;
+        a) AUTHOR="${OPTARG}" ;;
+        b) AUTHORLINK="${OPTARG}" ;;
+        B) AUTHORURL="${OPTARG}" ;;
+        F) FOOTER="${OPTARG}" ;;
+        f) FOOTERURL="${OPTARG}" ;;
+        I) IMAGEURL="${OPTARG}" ;;
+        i) THUMBURL="${OPTARG}" ;;
+        q) FALLBACK="${OPTARG}" ;;
+        x) DRYRUN=1 ;;
+        w) WEBHOOK="${OPTARG}" ;;
+        P) PRIORITY="${OPTARG}" ;;
+
+        :) echo "${red}ERROR: Option $OPTARG requires an argument. Quitting! ${reset}" >&2; exit 1 ;;
+        h) usage; exit ;;
+        ?) usage; exit ;;
+    esac
+done
+
+
+# ----------
+# Webhook Check
+# ----------
+if [[ $@ != *"-w"* ]]; then
+    echo "${blue}INFO: Webhook (-w) option not passed, looking for Webhook variable in script...${reset}"
+    # Check if webhook variable is empty
+    if [[ -z "${WEBHOOK}" ]]; then echo "${red}ERROR: Webhook variable not defined in script and not passed via command line. Quitting!${reset}"; echo ""; exit 1; fi
+    # Also check if default placeholder string has not been changed by user - check last 10 characters...
+    if [[ "${WEBHOOK: -10}" == "CCCCCCCCCC" ]]; then echo "${red}ERROR: Webhook variable not changed from initial placeholder. Quitting!${reset}"; echo ""; exit 1; fi
+else
+    echo "${blue}INFO: New Webhook URL passed as command line parameter...${reset}"
+fi
+echo "${yellow}webhook="${WEBHOOK}${reset} && echo ""
+
+# ----------
+# Test For Compulsary Fields
+# ----------
+if [[ -z "${TEXT}" ]]; then echo "${red}ERROR: You have not specified any TEXT (-t) to be sent.${reset}" && echo ""; exit 1; fi
+if [[ -z "${USERNAME}" ]]; then echo "${red}ERROR: You have not specified any USERNAME (-u) to be sent.${reset}" && echo ""; exit 1; fi
+
+# ----------
+# Define Values for Priority Options
+# ----------
+# Check for any user specified values passed which will override these pre-defined options
+echo "${blue}INFO: Checking for recognised PRIORITY string and setting template fields if not otherwise specified... ${magenta}${PRIORITY}${yellow}"
+if [[ "${PRIORITY}" == "info" ]]; then
+    if [[ -z "${EMOJI}" ]]; then EMOJI=":information_source:"; fi
+    if [[ -z "${COLOR}" ]]; then COLOR="blue"; fi
+    MESSAGE="INFO - $MESSAGE"
+elif [[ "${PRIORITY}" == "success" ]]; then
+    if [[ -z "${EMOJI}" ]]; then EMOJI=":heavy_check_mark:"; fi
+    if [[ -z "${COLOR}" ]]; then COLOR="green"; fi
+    MESSAGE="SUCCESS - $MESSAGE"
+elif [[ "${PRIORITY}" == "alert" ]]; then
+    if [[ -z "${EMOJI}" ]]; then EMOJI=":warning:"; fi
+    if [[ -z "${COLOR}" ]]; then COLOR="red"; fi
+    MESSAGE="ALERT - $MESSAGE"
+else
+    echo "${red}WARNING: Value passed for Priority (-P ${PRIORITY}) not recognised. Continuing without applying any template."
+fi
+echo "${reset}"
+
+# ----------
+# Check If Both Thumb and Image Passed - warning but don't stop
+# ----------
+if [[ -n "${THUMBURL}" ]] && [[ -n "${IMAGEURL}" ]]; then echo "${red}WARNING: You have passed both a Thumbnail and an Image - only the Image will be displayed.${reset}" && echo ""; fi
+
+# ----------
+# Color Conversion
+# ----------
+case ${COLOR} in
+    "green") echo "${blue}INFO: Color 'green' specified, converting to hex value #008000.${reset}" && echo ""; COLOR="#008000" ;;
+    "orange") echo "${blue}INFO: Color 'orange' specified, converting to hex value #FFA500.${reset}" && echo ""; COLOR="#FFA500" ;;
+    "red") echo "${blue}INFO: Color 'red' specified, converting to hex value #FF0000.${reset}" && echo ""; COLOR="#FF0000" ;;
+    "blue") echo "${blue}INFO: Color 'green' specified, converting to hex value #0000FF.${reset}" && echo ""; COLOR="#0000FF" ;;
+    "purple") echo "${blue}INFO: Color 'purple' specified, converting to hex value #800080.${reset}" && echo ""; COLOR="#800080" ;;
+    "pink") echo "${blue}INFO: Color 'pink' specified, converting to hex value #FFC0CB.${reset}" && echo ""; COLOR="#FFC0CB" ;;
+    "yellow") echo "${blue}INFO: Color 'yellow' specified, converting to hex value #FFFF00.${reset}" && echo ""; COLOR="#FFFF00" ;;
+esac
+
+# ----------
+# Craft Payload
+# ----------
+  # The complete Slack API payload, including attachments#
+
+    echo "{ " > /tmp/slack_payload
+        echo -n "\"username\": \"${USERNAME}\", " >> /tmp/slack_payload
+        echo -n "\"text\": \"${TEXT}\", " >> /tmp/slack_payload
+        echo -n "\"channel\": \"${CHANNEL}\", " >> /tmp/slack_payload
+        echo -n "\"icon_emoji\": \"${EMOJI}\", " >> /tmp/slack_payload
+        echo -n "\"attachments\": [{ " >> /tmp/slack_payload
+            echo -n "\"title\": \"${TITLE}\", " >> /tmp/slack_payload
+            echo -n "\"title_link\": \"${TITLELINK}\", " >> /tmp/slack_payload
+            echo -n "\"text\": \"${MESSAGE}\", " >> /tmp/slack_payload
+            echo -n "\"pretext\": \"${PRETEXT}\", " >> /tmp/slack_payload
+            echo -n "\"color\": \"${COLOR}\", " >> /tmp/slack_payload
+            echo -n "\"author_name\": \"${AUTHOR}\", " >> /tmp/slack_payload
+            echo -n "\"author_link\": \"${AUTHORLINK}\", " >> /tmp/slack_payload
+            echo -n "\"author_icon\": \"${AUTHORURL}\", " >> /tmp/slack_payload
+            echo -n "\"footer\": \"${FOOTER}\", " >> /tmp/slack_payload
+            echo -n "\"footer_icon\": \"${FOOTERURL}\", " >> /tmp/slack_payload
+            echo -n "\"image_url\": \"${IMAGEURL}\", " >> /tmp/slack_payload
+            echo -n "\"thumb_url\": \"${THUMBURL}\", " >> /tmp/slack_payload
+            echo -n "\"fallback\": \"${FALLBACK}\" " >> /tmp/slack_payload
+        echo -n " }]" >> /tmp/slack_payload
+    echo -n " }" >> /tmp/slack_payload
+
+    echo "${blue}INFO: Payload crafted...${reset}"
+    cat /tmp/slack_payload | jq && echo ""
+
+
+# ----------
+# Send Message
+# ----------
+# Send the payload to the Slack API
+echo "${blue}INFO: Command to be sent...${reset}"
+echo "${yellow}curl -s -S -X POST --data-urlencode "payload=$(< /tmp/slack_payload)" "${WEBHOOK}""${reset} && echo ""
+
+
+if [[ ${DRYRUN} = 1 ]]; then
+    echo "${blue}INFO: Dry-run option set. Not issuing command.${reset}" && echo ""
+    exit 0
+else
+    echo "${magenta}Sending message!${reset}" && echo ""
+    POST=$(curl -s -S -X POST --data-urlencode "payload=$(< /tmp/slack_payload)" "${WEBHOOK}");
+fi
+
+# Check if the message posted to the Slack API. A successful POST should return "ok". Anything other than "ok" indicates an issue
+if test "${POST}" != ok; then
+    echo "${red}ERROR: The POST to the Slack API failed (${blue}${POST}${red})${reset}" && echo ""
+else
+    if [[ -z ${CHANNEL} ]]; then CHANNEL="Webhook default channel"; fi
+    echo "${green}OK: Message successfully sent to the channel ${magenta}${CHANNEL}${reset} via the Slack API${reset}" && echo ""
+fi
